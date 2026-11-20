@@ -142,19 +142,24 @@ def verify_system_sources(archive_path, source):
     with tarfile.open(archive_path, "r:") as archive:
         manifest = decode(archive.extractfile("blobs/sha256/" + source["image_digest"][7:]).read())
         for layer in manifest["layers"]:
+            inherited_removed, replacement = False, None
             with tarfile.open(fileobj=archive.extractfile("blobs/sha256/" + layer["digest"][7:]), mode="r|gz") as contents:
                 for member in contents:
                     unpacked += member.size
                     require(unpacked <= 64 * 1024**3, "Image filesystem exceeds validation bound")
                     name = member.name.removeprefix("./")
-                    if "/.wh." in name:
-                        parent, leaf = name.rsplit("/", 1)
-                        deleted = parent if leaf == ".wh..wh..opq" else parent + "/" + leaf[4:]
-                        if target == deleted or target.startswith(deleted + "/"):
-                            status = None
+                    parent, _, leaf = name.rpartition("/")
+                    if leaf.startswith(".wh."):
+                        deleted = parent if leaf == ".wh..wh..opq" else "/".join(filter(None, (parent, leaf[4:])))
+                        if not deleted or target == deleted or target.startswith(deleted + "/"):
+                            inherited_removed = True
                     if name == target:
                         require(member.type == tarfile.REGTYPE and member.size <= 2 * 1024 * 1024, "Invalid installed package metadata")
-                        status = contents.extractfile(member).read().decode()
+                        replacement = contents.extractfile(member).read().decode()
+            if inherited_removed:
+                status = None
+            if replacement is not None:
+                status = replacement
     require(status is not None, "Image has no installed Debian package metadata")
     require(status_sources(status) == expected_system_sources(source["runtime"]), "Source mapping differs from actual image package metadata")
 
@@ -315,7 +320,10 @@ def workflow_identity():
     environment = public_api("repos/" + repository + "/environments/" + ENVIRONMENT)
     require(environment.get("id") == ENVIRONMENT_ID and environment.get("can_admins_bypass") is False, "Publication environment identity or bypass policy changed")
     require((environment.get("deployment_branch_policy") or {}).get("protected_branches") is True, "Publication environment must restrict protected branches")
-    require(any(rule.get("type") == "required_reviewers" and any(reviewer.get("type") == "User" and reviewer.get("reviewer", {}).get("id") == OWNER_REVIEWER_ID for reviewer in rule.get("reviewers", [])) for rule in environment.get("protection_rules", [])), "Publication environment requires the owner reviewer")
+    reviewer_rules = [rule for rule in environment.get("protection_rules", []) if rule.get("type") == "required_reviewers"]
+    require(len(reviewer_rules) == 1, "Publication environment requires exactly one owner reviewer rule")
+    reviewers = reviewer_rules[0].get("reviewers", [])
+    require(len(reviewers) == 1 and reviewers[0].get("type") == "User" and reviewers[0].get("reviewer", {}).get("id") == OWNER_REVIEWER_ID, "Publication environment requires only the owner reviewer")
     require(run(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip() == sha, "Checkout differs from dispatched commit")
     return repository
 
