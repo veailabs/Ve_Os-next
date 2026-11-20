@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "repository_id": 1465654995,
+  "runtime": "tensorfold",
+  "source_commit": "abaa6dd27cf5dca467ad8caedd23b5d49598cd9a",
+  "release_id": 452986058,
+  "release_tag": "local-ai-tensorfold-1.2.10-arm64-4a7e7d91307d",
+  "assets": [
+    {
+      "id": 772699445,
+      "name": "tensorfold-arm64.oci.tar",
+      "bytes": 582902784,
+      "sha256": "49075a69fb3d58cbf6361bec9bbc934c3e96158a77242068a5e5ae35ef9f4b16"
+    }
+  ],
+  "source_manifest_sha256": "73c40bc8b89d6d4701710c321c422fcc511475779d184aaac2bda26fbe17f130",
+  "source_assets": [
+    {
+      "id": 772699449,
+      "name": "ve-os-tensorfold-1.2.10-arm64-corresponding-source.tar",
+      "bytes": 515799040,
+      "sha256": "4719a19f7c203c3eae2214a14440a8764ade16d4d9117690e2dbc0b42deb014d"
+    }
+  ]
+}

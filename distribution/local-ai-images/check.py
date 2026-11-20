@@ -12,6 +12,8 @@ publish.require(sources, "No actual image source records")
 for path in sources:
     runtime = path.parent.name
     source = publish.source_record(runtime)
+    if (path.parent / "source-delivery.json").exists():
+        publish.source_delivery(runtime)
     if (path.parent / "release.json").exists():
         publish.release_record(runtime, source)
         print(runtime + ": source and release records verified locally")

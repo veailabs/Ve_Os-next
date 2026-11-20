@@ -2,7 +2,7 @@
 
 This directory holds reviewed source snapshots and local build evidence for the Ve local AI runtime images. `publish.py` validates actual OCI archives and publishes an allowlisted image through the protected GitHub workflow. It does not build images, change runtime catalog references, make packages public or claim GPU inference passed.
 
-The current TensorFold image was built and checked locally. Its source snapshot, exact OCI identity, component notices and runtime evidence live in `tensorfold/`. The large OCI archive remains a separate release artifact. No `release.json` is provided because no real release asset IDs have been recorded. Publication fails before network access when that reviewed record is missing. The other seven runtime names are allowlisted for future reviewed records; this does not claim their images exist.
+The current TensorFold image was built and checked locally. Its source snapshot, exact OCI identity, component notices and runtime evidence live in `tensorfold/`. The large OCI archive remains a separate release artifact. `release.json` records the actual uploaded OCI/source asset IDs and their independently downloaded byte hashes. Publication remains gated on review, protected-master merge, release publication and verified repository visibility. A runtime without a reviewed release record fails before network access. The other seven runtime names are allowlisted for future reviewed records; this does not claim their images exist.
 
 ## Publication boundary
 
