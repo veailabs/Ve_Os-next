@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "runtime": "tensorfold",
+  "platform": "linux/arm64",
+  "context_sha256": "3a5b014e9fc97c2f9f07f91059e9cce6e6cb993eb2d46e6969251a890826ce29",
+  "archive_sha256": "49075a69fb3d58cbf6361bec9bbc934c3e96158a77242068a5e5ae35ef9f4b16",
+  "archive_bytes": 582902784,
+  "image_digest": "sha256:4a7e7d91307d0dbb086f0e875ad94e908b30c9edda9bc0fd63a35cd54223939b",
+  "config_digest": "sha256:e3dbac12a8a415d0bf5a91c74340f9faa92cabc0c05a34734202cd471b28bda1"
+}

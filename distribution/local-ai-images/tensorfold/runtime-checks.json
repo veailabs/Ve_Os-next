@@ -1,0 +1,34 @@
+{
+  "image_manifest_digest": "sha256:4a7e7d91307d0dbb086f0e875ad94e908b30c9edda9bc0fd63a35cd54223939b",
+  "checks": {
+    "runtime-paths": {
+      "exit_code": 0,
+      "log": "tensorfold-runtime-paths.log"
+    },
+    "version": {
+      "exit_code": 0,
+      "log": "tensorfold-version.log"
+    },
+    "help": {
+      "exit_code": 0,
+      "log": "tensorfold-help.log"
+    },
+    "serve-help": {
+      "exit_code": 0,
+      "log": "tensorfold-serve-help.log"
+    },
+    "licenses": {
+      "exit_code": 0,
+      "log": "tensorfold-licenses.log"
+    },
+    "debian-packages": {
+      "exit_code": 0,
+      "log": "tensorfold-debian-packages.log"
+    }
+  },
+  "network": "none",
+  "read_only_root": true,
+  "gpu_devices_passed": false,
+  "model_weights_loaded": false,
+  "inference_tested": false
+}
