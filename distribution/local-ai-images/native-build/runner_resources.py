@@ -42,7 +42,7 @@ def validate_identity(environment, event, system, architecture, head):
     require(type(repository.get("id")) is int and repository["id"] == REPOSITORY_ID, "Wrong event repository")
     require(repository.get("private") is False, "Public repository required")
     name = repository.get("full_name", "")
-    require(name in {"veailabs/Ve_Os-next", "veailabs/Ve_Os"}, "Unexpected repository name")
+    require(name in {"veailabs/Ve_Os-next", "veailabs/VE-OS"}, "Unexpected repository name")
     require(environment.get("GITHUB_REPOSITORY") == name, "Repository identity differs from event")
     sha = environment.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", sha) is not None and head == sha, "Checkout differs from dispatched source")

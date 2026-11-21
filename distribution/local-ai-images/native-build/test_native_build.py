@@ -14,9 +14,9 @@ class RunnerIdentityTests(unittest.TestCase):
         self.environment = {"GITHUB_ACTIONS": "true", "VERIFIED_RUNNER_ENVIRONMENT": "github-hosted",
                             "GITHUB_REPOSITORY_ID": "1465654995", "GITHUB_REF": "refs/heads/master",
                             "VERIFIED_REF_PROTECTED": "true", "GITHUB_EVENT_NAME": "workflow_dispatch",
-                            "GITHUB_REPOSITORY": "veailabs/Ve_Os-next", "GITHUB_SHA": "a" * 40,
+                            "GITHUB_REPOSITORY": "veailabs/VE-OS", "GITHUB_SHA": "a" * 40,
                             "EXPECTED_ARCH": "x86_64", "RECLAIM_TOOLS": "false"}
-        self.event = {"repository": {"id": 1465654995, "private": False, "full_name": "veailabs/Ve_Os-next"}}
+        self.event = {"repository": {"id": 1465654995, "private": False, "full_name": "veailabs/VE-OS"}}
 
     def validate(self, **changes):
         arguments = {"environment": self.environment, "event": self.event, "system": "Linux",
@@ -25,12 +25,18 @@ class RunnerIdentityTests(unittest.TestCase):
         return runner.validate_identity(**arguments)
 
     def test_actual_public_native_dispatch_identity_is_accepted(self):
+        self.assertEqual(self.validate(), "veailabs/VE-OS")
+
+    def test_temporary_same_repository_identity_is_accepted(self):
+        self.environment["GITHUB_REPOSITORY"] = "veailabs/Ve_Os-next"
+        self.event["repository"]["full_name"] = "veailabs/Ve_Os-next"
         self.assertEqual(self.validate(), "veailabs/Ve_Os-next")
 
-    def test_renamed_same_repository_identity_is_accepted(self):
+    def test_old_fork_name_is_rejected_even_with_matching_event(self):
         self.environment["GITHUB_REPOSITORY"] = "veailabs/Ve_Os"
         self.event["repository"]["full_name"] = "veailabs/Ve_Os"
-        self.assertEqual(self.validate(), "veailabs/Ve_Os")
+        with self.assertRaises(runner.QualificationError):
+            self.validate()
 
     def test_untrusted_execution_contexts_are_rejected(self):
         changes = {"GITHUB_ACTIONS": "false", "VERIFIED_RUNNER_ENVIRONMENT": "self-hosted",

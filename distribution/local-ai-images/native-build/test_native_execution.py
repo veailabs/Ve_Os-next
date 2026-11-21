@@ -79,7 +79,7 @@ class ServiceTests(unittest.TestCase):
                        "GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "1"}
         output = io.StringIO()
         with patch.dict(os.environ, environment), \
-             patch.object(execution, "qualify", return_value=("a" * 40, "veailabs/Ve_Os-next", {})), \
+             patch.object(execution, "qualify", return_value=("a" * 40, "veailabs/VE-OS", {})), \
              patch.object(execution.volume, "volume_root", return_value=self.root), \
              patch.object(execution.volume, "create_volume", return_value=(self.root, self.root / "work", {"state": "mounted"})), \
              patch.object(execution, "prepare_work", return_value={}), \

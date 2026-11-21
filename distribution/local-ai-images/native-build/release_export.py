@@ -18,7 +18,7 @@ OWNER_REVIEWER_ID = 214956837
 
 class GitHubReleaseClient:
     def __init__(self, repository, token, deadline):
-        require(repository in {"veailabs/Ve_Os-next", "veailabs/Ve_Os"}, "Unexpected release repository")
+        require(repository in {"veailabs/Ve_Os-next", "veailabs/VE-OS"}, "Unexpected release repository")
         require(isinstance(token, str) and 0 < len(token) <= 4096 and all(32 < ord(value) < 127 for value in token),
                 "Invalid temporary upload credential")
         self.repository = repository
