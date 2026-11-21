@@ -256,8 +256,12 @@ class PublicationTests(unittest.TestCase):
         sha = "a" * 40
         environment = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REPOSITORY_ID": str(publisher.REPOSITORY_ID), "GITHUB_REF": "refs/heads/master", "GITHUB_REPOSITORY": "veailabs/Ve_Os-next", "GITHUB_SHA": sha}
         answers = [{"id": publisher.REPOSITORY_ID, "private": False, "default_branch": "master"}, {"protected": True, "commit": {"sha": sha}}, {"id": publisher.ENVIRONMENT_ID, "can_admins_bypass": False, "deployment_branch_policy": {"protected_branches": True}, "protection_rules": [{"type": "required_reviewers", "reviewers": [{"type": "User", "reviewer": {"id": publisher.OWNER_REVIEWER_ID}}]}]}]
-        with patch.dict(os.environ, environment, clear=True), patch.object(publisher, "public_api", side_effect=answers), patch.object(publisher, "run", return_value=sha.encode()):
-            self.assertEqual(publisher.workflow_identity(), "veailabs/Ve_Os-next")
+        for name in ("veailabs/Ve_Os-next", "veailabs/VE-OS"):
+            with self.subTest(repository=name), patch.dict(os.environ, dict(environment, GITHUB_REPOSITORY=name), clear=True), patch.object(publisher, "public_api", side_effect=answers) as api, patch.object(publisher, "run", return_value=sha.encode()):
+                self.assertEqual(publisher.workflow_identity(), name)
+                self.assertEqual(api.call_args_list[0].args[0], "repos/" + name)
+                self.assertEqual(api.call_args_list[1].args[0], "repos/" + name + "/branches/master")
+        environment["GITHUB_REPOSITORY"] = "veailabs/VE-OS"
         owner = {"type": "User", "reviewer": {"id": publisher.OWNER_REVIEWER_ID}}
         extra_user = {"type": "User", "reviewer": {"id": 999}}
         extra_team = {"type": "Team", "reviewer": {"id": 999}}
@@ -271,7 +275,7 @@ class PublicationTests(unittest.TestCase):
             with self.subTest(key=key), patch.dict(os.environ, environment, clear=True), patch.object(publisher, "public_api", side_effect=rejected), patch.object(publisher, "run", return_value=sha.encode()):
                 with self.assertRaises(ValueError):
                     publisher.workflow_identity()
-        for key, value in [("GITHUB_EVENT_NAME", "pull_request_target"), ("GITHUB_REF", "refs/heads/feature"), ("GITHUB_REPOSITORY_ID", "1"), ("GITHUB_REPOSITORY", "someone/Ve_Os")]:
+        for key, value in [("GITHUB_EVENT_NAME", "pull_request_target"), ("GITHUB_REF", "refs/heads/feature"), ("GITHUB_REPOSITORY_ID", "1"), ("GITHUB_REPOSITORY", "someone/Ve_Os"), ("GITHUB_REPOSITORY", "veailabs/Ve_Os")]:
             with self.subTest(key=key), patch.dict(os.environ, dict(environment, **{key: value}), clear=True), patch.object(publisher, "public_api") as api:
                 with self.assertRaises(ValueError):
                     publisher.workflow_identity()

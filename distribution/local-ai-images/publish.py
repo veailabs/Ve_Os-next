@@ -310,7 +310,7 @@ def workflow_identity():
     require(os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch", "Publication requires a manually dispatched GitHub workflow")
     require(os.environ.get("GITHUB_REPOSITORY_ID") == str(REPOSITORY_ID) and os.environ.get("GITHUB_REF") == "refs/heads/master", "Wrong workflow repository or ref")
     repository = os.environ.get("GITHUB_REPOSITORY", "")
-    require(repository in ("veailabs/Ve_Os-next", "veailabs/Ve_Os"), "Unexpected repository name")
+    require(repository in ("veailabs/Ve_Os-next", "veailabs/VE-OS"), "Unexpected repository name")
     sha = os.environ.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", sha), "Invalid workflow commit")
     repo = public_api("repos/" + repository)
