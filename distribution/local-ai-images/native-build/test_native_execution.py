@@ -73,6 +73,29 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(QualificationError, "successfully"):
                 execution.bounded_service([sys.executable, "-c", "raise SystemExit(2)"], self.root / "log", self.unit, time.monotonic() + 5)
 
+    def test_failed_smoke_emits_actual_service_log_and_retains_cleanup_error_chain(self):
+        command = [sys.executable, "-c", "print('::warning::smoke failure evidence');raise SystemExit(2)"]
+        environment = {"RUNNER_TEMP": str(self.root), "GITHUB_WORKSPACE": str(self.root / "checkout"),
+                       "GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "1"}
+        output = io.StringIO()
+        with patch.dict(os.environ, environment), \
+             patch.object(execution, "qualify", return_value=("a" * 40, "veailabs/Ve_Os-next", {})), \
+             patch.object(execution.volume, "volume_root", return_value=self.root), \
+             patch.object(execution.volume, "create_volume", return_value=(self.root, self.root / "work", {"state": "mounted"})), \
+             patch.object(execution, "prepare_work", return_value={}), \
+             patch.object(builder, "service_command", return_value=command), \
+             patch.object(execution, "controller_environment", return_value={"PATH": "/usr/bin:/bin"}), \
+             patch.object(execution, "stop_unit"), \
+             patch.object(execution.volume, "remove_volume", side_effect=QualificationError("cleanup failed")), \
+             contextlib.redirect_stdout(output):
+            with self.assertRaises(QualificationError) as raised:
+                execution.execute_smoke()
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["stage"], "native-smoke")
+        self.assertEqual(report["bounded_log_tail"], "::warning::smoke failure evidence\n")
+        self.assertEqual([item["message"] for item in execution.failure_details(raised.exception)["failures_latest_first"]],
+                         ["cleanup failed", "Native service did not complete successfully"])
+
     def test_missing_unit_is_clean_but_missing_user_bus_is_not(self):
         absent = subprocess.CompletedProcess([], 4, b"LoadState=not-found\nActiveState=inactive\n", b"Unit not found")
         with patch.object(process, "controller_environment", return_value={}), patch.object(process.subprocess, "run", return_value=absent) as call:
@@ -92,6 +115,28 @@ class ServiceTests(unittest.TestCase):
 
 
 class NativeEvidenceTests(unittest.TestCase):
+    def test_cli_returns_failure_and_reports_primary_and_cleanup_errors(self):
+        program = '''import sys
+from unittest.mock import patch
+import native_execution as execution
+from native_profile import QualificationError
+def fail():
+    try:
+        raise QualificationError("primary smoke failure")
+    finally:
+        raise QualificationError("secondary cleanup failure")
+sys.argv=["native_execution.py","smoke"]
+with patch.object(execution,"execute_smoke",side_effect=fail):
+    raise SystemExit(execution.main())
+'''
+        result = subprocess.run([sys.executable, "-c", program], cwd=Path(execution.__file__).parent,
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        diagnostic = json.loads(result.stderr.split("Native execution failed: ", 1)[1])
+        self.assertEqual([item["message"] for item in diagnostic["failures_latest_first"]],
+                         ["secondary cleanup failure", "primary smoke failure"])
+
     def test_primary_failure_survives_cleanup_failure_in_diagnostics(self):
         try:
             try:

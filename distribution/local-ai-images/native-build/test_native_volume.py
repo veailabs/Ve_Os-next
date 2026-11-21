@@ -151,7 +151,9 @@ class VolumeBoundaryTests(unittest.TestCase):
 
     def test_detached_device_node_does_not_block_image_removal_but_active_mapping_does(self):
         for remaining, removed in (({"loopdevices": [{"name": "/dev/loop99"}]}, True),
-                                   ({"loopdevices": [{"name": self.device}]}, False), ({}, False)):
+                                   ({"loopdevices": [{"name": self.device}]}, False), ({}, False), ([], False),
+                                   ({"loopdevices": [{}]}, False), ({"loopdevices": [None]}, False),
+                                   ({"loopdevices": [{"name": "/dev/sda"}]}, False), ({"loopdevices": [{"name": 1}]}, False)):
             with self.subTest(remaining=remaining):
                 self.image.write_bytes(b"a" * 4096)
                 metadata = self.image.stat()

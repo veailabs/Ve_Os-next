@@ -331,7 +331,7 @@ def execute_smoke():
             summary.write("## Native isolation smoke\n\n```json\n" + json.dumps(proof, indent=2) + "\n```\n\nNo image compilation or export was performed.\n")
 
 
-if __name__ == "__main__":
+def main():
     try:
         require(len(sys.argv) == 2 and sys.argv[1] in {"smoke", "destination-preflight", "prepare-export", "upload", "cleanup"}, "Unsupported native operation")
         if sys.argv[1] == "smoke":
@@ -347,4 +347,9 @@ if __name__ == "__main__":
             print(json.dumps(cleanup_owned()))
     except (QualificationError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
         print("Native execution failed: " + json.dumps(failure_details(error)), file=sys.stderr)
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
