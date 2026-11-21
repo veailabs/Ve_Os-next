@@ -1,5 +1,7 @@
 # Ve OS
 
+The canonical repository name is **veailabs/VE-OS**. The temporary **Ve_Os-next** name is being retired under [task 677](https://github.com/veailabs/ve-core-workspace/issues/677). The rename preserves the independent repository's identity and `master` default branch.
+
 Ve OS distribution development is in progress. This repository starts with the protected local AI image publication component. The full desktop, installer, package repository and VM release are being completed under [workspace task638](https://github.com/veailabs/ve-core-workspace/issues/638).
 
 The current component validates reviewed image sources and immutable release inputs, publishes an exact OCI digest through a protected workflow, and verifies an anonymous pull. It uses a temporary GitHub token. It does not claim that an OS release or GPU inference has been verified.

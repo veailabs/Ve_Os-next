@@ -6,7 +6,7 @@ The current TensorFold image was built and checked locally. Its source snapshot,
 
 ## Publication boundary
 
-`.github/workflows/local-ai-images.yml` runs only by manual dispatch on protected `master`, for repository ID `1465654995`. The current name is `veailabs/Ve_Os-next`; the approved canonical rename is `veailabs/Ve_Os`, with the same immutable repository ID. Standard hosted execution is disabled while the repository is private, avoiding unverified private-runner charges. A source/publication audit must precede making the repository and release assets public.
+`.github/workflows/local-ai-images.yml` runs only by manual dispatch on protected `master`, for repository ID `1465654995`. The owner's canonical repository name is `veailabs/VE-OS`; the temporary `veailabs/Ve_Os-next` name remains accepted during the rename of that same repository. The old `veailabs/Ve_Os` fork is not an accepted publication repository. Repository and environment IDs, protected-master checks, reviewer requirements and package digest identities stay unchanged. Standard hosted execution is disabled while the repository is private, avoiding unverified private-runner charges. A source/publication audit must precede making the repository and release assets public.
 
 The workflow uses environment `ve-os-image-publication`, ID `28014484873`. The helper verifies its actual GitHub metadata: protected branches required, exactly one required-reviewer rule containing only owner user ID `214956837`, and `can_admins_bypass=false`. The coordinator independently created/read back those settings. The helper also checks that the current master commit remains the dispatched SHA and that the checkout matches it. No branch, pull-request or user-supplied URL is accepted as publication input.
 
