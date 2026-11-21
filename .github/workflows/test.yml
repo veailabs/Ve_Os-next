@@ -41,11 +41,27 @@ jobs:
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/ve-os-image-check"
 
+  native-build:
+    if: ${{ github.event.repository.private == false && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check native build and export boundaries
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 distribution/local-ai-images/native-build/check.py
+
   ci-ok:
     if: ${{ always() && github.event.repository.private == false && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
-    needs: [publisher]
+    needs: [publisher, native-build]
     runs-on: ubuntu-24.04
     steps:
       - env:
-          RESULT: ${{ needs.publisher.result }}
-        run: test "$RESULT" = success
+          PUBLISHER_RESULT: ${{ needs.publisher.result }}
+          NATIVE_RESULT: ${{ needs.native-build.result }}
+        run: |
+          test "$PUBLISHER_RESULT" = success
+          test "$NATIVE_RESULT" = success

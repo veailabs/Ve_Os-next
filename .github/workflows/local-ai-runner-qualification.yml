@@ -1,0 +1,56 @@
+name: Qualify native local AI build runners
+
+on:
+  workflow_dispatch:
+    inputs:
+      reclaim_tools:
+        description: Remove only listed unused SDKs on these disposable runners
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-ai-runner-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_id == '1465654995' && github.ref == 'refs/heads/master' && github.ref_protected && github.event.repository.private == false }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: x86_64
+          - runner: ubuntu-24.04-arm
+            architecture: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Check qualification boundaries
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/check.py
+      - name: Measure the dedicated runner
+        env:
+          EXPECTED_ARCH: ${{ matrix.architecture }}
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          VERIFIED_REF_PROTECTED: ${{ github.ref_protected }}
+          RECLAIM_TOOLS: ${{ inputs.reclaim_tools }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/runner_resources.py
+      - name: Prove native x64 isolation before compilation
+        if: ${{ matrix.architecture == 'x86_64' }}
+        env:
+          EXPECTED_ARCH: x86_64
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          VERIFIED_REF_PROTECTED: ${{ github.ref_protected }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py smoke

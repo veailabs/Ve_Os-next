@@ -1,0 +1,3 @@
+#!/bin/bash
+set -euo pipefail
+exec flock /tmp/ve-os-glslc-build.lock /usr/bin/glslc "$@"
