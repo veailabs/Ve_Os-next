@@ -1,0 +1,78 @@
+name: Build and export a native llama.cpp draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      reclaim_tools:
+        description: Remove only listed unused SDKs on this disposable runner
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-ai-native-build
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  EXPECTED_ARCH: x86_64
+  VERIFIED_REF_PROTECTED: ${{ github.ref_protected }}
+  VE_OS_IMAGE_BUILD_EXPORT_ENVIRONMENT_ID: ${{ vars.VE_OS_IMAGE_BUILD_EXPORT_ENVIRONMENT_ID }}
+
+jobs:
+  preflight:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_id == '1465654995' && github.ref == 'refs/heads/master' && github.ref_protected && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Verify the existing owner-gated destination
+        env:
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py destination-preflight
+
+  build-export:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    environment: ve-os-image-build-export
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Recheck destination before runner changes or build allocations
+        env:
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py destination-preflight
+      - name: Verify the reviewed native build helpers
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/check.py
+      - name: Measure the dedicated standard runner
+        env:
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          RECLAIM_TOOLS: ${{ inputs.reclaim_tools }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/runner_resources.py
+      - name: Qualify, acquire complete sources, build, validate and freeze
+        env:
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py prepare-export
+      - name: Upload only the frozen validated draft and read back every asset
+        timeout-minutes: 35
+        env:
+          VERIFIED_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          GH_TOKEN: ${{ github.token }}
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py upload
+      - name: Stop owned processes and remove the bounded filesystem
+        if: ${{ always() }}
+        timeout-minutes: 5
+        run: /usr/bin/python3 distribution/local-ai-images/native-build/native_execution.py cleanup

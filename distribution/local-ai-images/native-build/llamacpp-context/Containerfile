@@ -1,0 +1,73 @@
+ARG BASE=docker.io/library/archlinux@sha256:fcee73ea1b96e236248f53a213f71276cc9072d9025b58bce9915e32f19963ae
+ARG SOURCE_BASE=source-ready
+ARG BUILD_OUTPUT=build
+FROM ${BASE} AS pinned-base
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+ARG TARGETARCH
+RUN test "${TARGETARCH}" = amd64
+COPY metadata/core.db metadata/extra.db /locks/metadata/
+COPY metadata/source-package-archives.json /locks/metadata/source-package-archives.json
+COPY snapshot.sha256 pacman.conf build.versions runtime.versions /locks/
+COPY scripts/install-arch.sh /locks/scripts/install-arch.sh
+COPY scripts/capture-packages.sh /locks/scripts/capture-packages.sh
+COPY scripts/acquire-sources.py /locks/scripts/acquire-sources.py
+FROM pinned-base AS source-ready
+RUN bash /locks/scripts/install-arch.sh build
+RUN python /locks/scripts/acquire-sources.py
+FROM ${SOURCE_BASE} AS build
+RUN test -s /ve-source-export/acquisition.json \
+ && test "$(git -C /src rev-parse HEAD)" = 6f311d7ad63dce97a3ad1deaafb7cc044bb8c26c \
+ && test "$(git -C /src rev-parse HEAD^{tree})" = 4f4e5909f01bb09924a9005dc3c94705aff0f9b1
+COPY scripts/glslc-serial /locks/scripts/glslc-serial
+RUN chmod 755 /locks/scripts/glslc-serial
+RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON \
+      -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_OPENSSL=OFF \
+      -DLLAMA_BUILD_NUMBER=12521 -DLLAMA_BUILD_COMMIT=6f311d7 \
+      -DVulkan_GLSLC_EXECUTABLE=/locks/scripts/glslc-serial \
+ && cmake --build /build --parallel 1 \
+ && DESTDIR=/out cmake --install /build --strip \
+ && find /out/usr/bin -type f ! -name llama-server ! -name llama-bench ! -name 'libggml-*.so' -delete
+RUN mkdir -p /evidence \
+ && cd /build \
+ && find . -type f \( -name CMakeCache.txt -o -name compile_commands.json -o -name link.txt -o -name '*.o.d' -o -name '*vulkan-shaders*' \) -print0 \
+    | tar --null --files-from=- -czf /evidence/compile-link-inputs.tar.gz \
+ && find /out -type f \( -name 'llama-*' -o -name '*.so*' \) -print0 \
+    | sort -z | xargs -0 -r readelf --dynamic > /evidence/installed-elf-dynamic.txt \
+ && git -C /src ls-tree -r HEAD > /evidence/upstream-tree.txt \
+ && git -C /src archive --format=tar HEAD | gzip -n > /evidence/llama-upstream-source.tar.gz
+COPY scripts/capture-installed.py /locks/scripts/capture-installed.py
+RUN python /locks/scripts/capture-installed.py
+RUN mkdir -p /licenses \
+ && cd /src \
+ && find . -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' \) -print \
+    | while read -r file; do install -Dm644 "$file" "/licenses/${file#./}"; done \
+ && cp -a /src/vendor /licenses/vendor-original-sources
+FROM ${BUILD_OUTPUT} AS compiled-output
+FROM pinned-base AS runtime
+RUN bash /locks/scripts/install-arch.sh runtime
+COPY --from=compiled-output /out/usr/bin/ /usr/bin/
+COPY --from=compiled-output /out/usr/lib/ /usr/lib/
+COPY --from=compiled-output /licenses /usr/share/licenses/llama.cpp
+COPY --from=compiled-output /build/CMakeCache.txt /usr/share/ve-os-local-ai/CMakeCache.txt
+COPY --from=compiled-output /usr/share/ve-os-local-ai/arch-build-installed.txt /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /usr/share/ve-os-local-ai/arch-build-transaction.txt /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /usr/share/ve-os-local-ai/arch-build-package-evidence /usr/share/ve-os-local-ai/arch-build-package-evidence
+COPY --from=compiled-output /evidence/compile-link-inputs.tar.gz /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /evidence/installed-elf-dynamic.txt /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /evidence/upstream-tree.txt /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /evidence/llama-upstream-source.tar.gz /usr/share/ve-os-local-ai/
+COPY --from=compiled-output /evidence/installed-output-files.json /usr/share/ve-os-local-ai/
+COPY packaging-LICENSE /usr/share/licenses/ve-os-local-ai/LICENSE
+ARG VE_SOURCE_REVISION
+ARG VE_SOURCE_URL
+RUN test -n "${VE_SOURCE_REVISION}" && test -n "${VE_SOURCE_URL}"
+LABEL org.opencontainers.image.source="${VE_SOURCE_URL}" \
+      org.opencontainers.image.revision="${VE_SOURCE_REVISION}" \
+      org.opencontainers.image.title="Ve OS llama.cpp Vulkan runtime" \
+      org.opencontainers.image.version="b12521" \
+      org.opencontainers.image.licenses="MIT AND LicenseRef-Bundled-Third-Party" \
+      io.ve-os.source.status="local-candidate-unpublished"
+EXPOSE 8080
+CMD ["llama-server", "--host", "0.0.0.0", "--port", "8080"]

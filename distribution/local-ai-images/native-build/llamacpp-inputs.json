@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "runtime": "llamacpp",
+  "status": "reviewed-input-candidate-not-built",
+  "files": [
+    {
+      "path": "Containerfile",
+      "bytes": 4571,
+      "sha256": "7624af7f1b3f5aae6a2f105fd14514ece29681e511ddb0a6b604a59a727ccacf"
+    },
+    {
+      "path": "README.md",
+      "bytes": 556,
+      "sha256": "b094b4cc7086c1038158f0b29ac83c7a30ada6aa5e479256a2df2645d1fb5a56"
+    },
+    {
+      "path": "build.versions",
+      "bytes": 3526,
+      "sha256": "9a7f7de0d5f68031324dac1c5eba7839c404d0eea734381b3160c00e2f9fbb9f"
+    },
+    {
+      "path": "metadata/README.md",
+      "bytes": 543,
+      "sha256": "fcec1aca98e0a4b688f0dad79da1cbe7842dea0d80b1cacf634a704854505987"
+    },
+    {
+      "path": "metadata/core.db",
+      "bytes": 131015,
+      "sha256": "4f8500dd1212ea0e777b7406ba8cef681bb8b624adff4505f02df113b65ec7bc"
+    },
+    {
+      "path": "metadata/extra.db",
+      "bytes": 9091568,
+      "sha256": "aac830c120d19bc18a5952ea1a5e600ea26e57253bbfd5efd35da18fccf067d7"
+    },
+    {
+      "path": "metadata/source-package-archives.json",
+      "bytes": 176982,
+      "sha256": "56adee820ae41f77009e3471985344131d615bc9e2c290367fd53755d2304934"
+    },
+    {
+      "path": "packaging-LICENSE",
+      "bytes": 1063,
+      "sha256": "717ba1949502290f8e47688ae2e323acd06c8ca47aec9f7596b15f678c1af4a2"
+    },
+    {
+      "path": "pacman.conf",
+      "bytes": 289,
+      "sha256": "5654f6cc31f86cf95d413ae9e966cc6888876fcb66243d4000dc6b4fe5efa4a1"
+    },
+    {
+      "path": "runtime.versions",
+      "bytes": 2999,
+      "sha256": "0aad6c5a177384c31297da91c829ca2ed8c56da61534df56d5ebfffb1b9652a5"
+    },
+    {
+      "path": "scripts/README.md",
+      "bytes": 639,
+      "sha256": "aa821e7883a747b4d9079cfbf6d2a8fd8fe0bd569882e34f08c7bc0962acac8c"
+    },
+    {
+      "path": "scripts/acquire-sources.py",
+      "bytes": 26069,
+      "sha256": "eb20e5d2e9facb1f6dc209cf756fadeb2980e882845670e6549b6c302acea993"
+    },
+    {
+      "path": "scripts/capture-installed.py",
+      "bytes": 1010,
+      "sha256": "378f020e025fb7506674b51dc93ba3f32dd2d149cb1fdd3eb671daba9c780859"
+    },
+    {
+      "path": "scripts/capture-packages.sh",
+      "bytes": 721,
+      "sha256": "7f567905815b0ed3e135958bfd427cfcd0889368d535124ad948045aee176a70"
+    },
+    {
+      "path": "scripts/glslc-serial",
+      "bytes": 89,
+      "sha256": "73d09bbf83aabfbc2fe590f57252aadd9a8ca68826cc213d61bfb7f4978dcdca"
+    },
+    {
+      "path": "scripts/install-arch.sh",
+      "bytes": 1230,
+      "sha256": "a66ca63b5f0eecdd754ea22f754e7e6d1ccd0d535fe0a0e2a068600ea7ec8f83"
+    },
+    {
+      "path": "snapshot.sha256",
+      "bytes": 167,
+      "sha256": "2eaa984ea3f236bd4013d939f426f6f770c971954fc1b44c3ff6abdd7d8d40bf"
+    }
+  ]
+}
