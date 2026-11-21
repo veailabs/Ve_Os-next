@@ -22,6 +22,29 @@ class Cancelled(QualificationError):
     pass
 
 
+def failure_details(error):
+    failures = []
+    seen = set()
+    while error is not None and id(error) not in seen and len(failures) < 8:
+        seen.add(id(error))
+        failures.append({"type": type(error).__name__, "message": str(error)[:4096]})
+        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+    return {"failures_latest_first": failures}
+
+
+def report_failure_log(path):
+    if not path.exists():
+        return
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as log:
+        metadata = os.fstat(log.fileno())
+        require(stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1 and metadata.st_size <= PROFILE["document_bytes"],
+                "Invalid native failure log")
+        log.seek(max(0, metadata.st_size - 32768))
+        tail = log.read(32768).decode(errors="replace")
+    print(json.dumps({"status": "native-stage-failed", "stage": path.stem, "bounded_log_tail": tail}))
+
+
 def bounded_service(command, log_path, unit, deadline, host_path=None):
     require(deadline > time.monotonic(), "Native service deadline reached")
     descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -218,10 +241,7 @@ def prepare_export():
         if current_log is not None and current_log.is_file() and not current_log.is_symlink():
             require(current_log.stat().st_size <= PROFILE["document_bytes"], "Failed stage log exceeded limit")
             shutil.copyfile(current_log, root / "native-failure.log")
-            with current_log.open("rb") as log:
-                log.seek(max(0, current_log.stat().st_size - 32768))
-                tail = log.read(32768).decode(errors="replace")
-            print(json.dumps({"status": "native-stage-failed", "stage": current_log.stem, "bounded_log_tail": tail}))
+            report_failure_log(current_log)
         cleanup_owned()
         raise
     finally:
@@ -289,6 +309,9 @@ def execute_smoke():
         write_document(root / "native-smoke.json", proof)
         result = {"status": "native-smoke-passed", "source_sha": source, "unit": unit,
                   "proof": str(root / "native-smoke.json"), "build_qualified": False}
+    except BaseException:
+        report_failure_log(root / "native-smoke.log")
+        raise
     finally:
         try:
             if receipt is None and (root / "volume.json").exists():
@@ -323,5 +346,5 @@ if __name__ == "__main__":
         else:
             print(json.dumps(cleanup_owned()))
     except (QualificationError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
-        print("Native execution failed: " + str(error), file=sys.stderr)
+        print("Native execution failed: " + json.dumps(failure_details(error)), file=sys.stderr)
         sys.exit(1)

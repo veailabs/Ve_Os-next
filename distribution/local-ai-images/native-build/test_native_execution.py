@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -11,6 +13,7 @@ from unittest.mock import patch
 import native_builder as builder
 import native_execution as execution
 import native_process as process
+import runner_resources as runner
 from native_profile import PROFILE, QualificationError
 
 
@@ -89,6 +92,49 @@ class ServiceTests(unittest.TestCase):
 
 
 class NativeEvidenceTests(unittest.TestCase):
+    def test_primary_failure_survives_cleanup_failure_in_diagnostics(self):
+        try:
+            try:
+                raise QualificationError("native smoke failed")
+            finally:
+                raise QualificationError("cleanup failed")
+        except QualificationError as error:
+            report = execution.failure_details(error)
+        self.assertEqual([entry["message"] for entry in report["failures_latest_first"]],
+                         ["cleanup failed", "native smoke failed"])
+
+    def test_failure_log_tail_is_bounded_and_workflow_commands_remain_data(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "native-smoke.log"
+            path.write_text("a" * 40000 + "\n::warning::untrusted output\n")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                execution.report_failure_log(path)
+            lines = output.getvalue().splitlines()
+            self.assertEqual(len(lines), 1)
+            report = json.loads(lines[0])
+            self.assertEqual(len(report["bounded_log_tail"]), 32768)
+            self.assertIn("\n::warning::untrusted output\n", report["bounded_log_tail"])
+            link = Path(temporary) / "link"
+            link.symlink_to(path)
+            with self.assertRaises(OSError):
+                execution.report_failure_log(link)
+
+    def test_fixed_platform_command_reports_bounded_escaped_stderr_without_general_arguments(self):
+        failed = subprocess.CompletedProcess([], 1, "", "\n::warning::platform error\n" + "x" * 3000)
+        with patch.object(runner.subprocess, "run", return_value=failed):
+            with self.assertRaises(QualificationError) as raised:
+                runner.run(["sudo", "-n", "losetup", "--detach", "--", "/dev/loop12"])
+            diagnostic = json.loads(str(raised.exception).split(": ", 1)[1])
+            self.assertEqual(diagnostic["command"], "sudo losetup")
+            self.assertEqual(diagnostic["exit_code"], 1)
+            self.assertEqual(len(diagnostic["stderr"]), 2048)
+            self.assertNotIn("\n", str(raised.exception))
+            with self.assertRaises(QualificationError) as raised:
+                runner.run(["git", "DO_NOT_REPORT_ARGUMENT"])
+            self.assertNotIn("DO_NOT_REPORT_ARGUMENT", str(raised.exception))
+            self.assertNotIn("stderr", str(raised.exception))
+
     def proof(self):
         return {"status": "native-smoke-passed", "runtime": "llamacpp", "source_sha": "a" * 40,
                 "unit": "ve-os-native-123-1.service", "base_digest": PROFILE["base"].split("@", 1)[1],

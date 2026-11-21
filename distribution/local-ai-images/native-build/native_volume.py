@@ -169,9 +169,10 @@ def remove_volume(runner_temp, receipt, deadline=None):
         run(["sudo", "-n", "umount", "--", str(mountpoint)], deadline=deadline)
         require(not mounted_at(mountpoint), "Owned filesystem remains mounted")
     validate_loop(loop_record(device, deadline=deadline), device, image, validate_image(image, receipt), receipt["budget"]["loop_bytes"])
-    run(["sudo", "-n", "losetup", "--detach", "--", device], deadline=deadline)
-    remaining = json.loads(run(["sudo", "-n", "losetup", "--list", "--json", "--output", "NAME", "--", device], deadline=deadline))
-    require(not remaining.get("loopdevices"), "Loop mapping remains attached")
+    run(["sudo", "-n", "losetup", "--detach", device], deadline=deadline)
+    remaining = json.loads(run(["sudo", "-n", "losetup", "--list", "--json", "--output", "NAME"], deadline=deadline))
+    require(isinstance(remaining.get("loopdevices"), list), "Invalid active loop inventory")
+    require(all(item.get("name") != device for item in remaining["loopdevices"]), "Loop mapping remains attached")
     validate_image(image, receipt)
     image.unlink()
     receipt["state"] = "removed"

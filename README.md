@@ -6,6 +6,8 @@ The current component validates reviewed image sources and immutable release inp
 
 Read [the publication documentation](distribution/local-ai-images/README.md) for trust boundaries, source delivery, local checks and the required GitHub environment. Publication bootstrap work is tracked in [task664](https://github.com/veailabs/ve-core-workspace/issues/664).
 
+Merged changes are recorded in [the changelog](CHANGELOG.md).
+
 ```sh
 python3 distribution/local-ai-images/check.py
 ```

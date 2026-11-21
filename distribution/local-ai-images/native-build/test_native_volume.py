@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -147,6 +148,36 @@ class VolumeBoundaryTests(unittest.TestCase):
                 volume.remove_volume(self.root, receipt)
             mounted.assert_not_called()
             execute.assert_not_called()
+
+    def test_detached_device_node_does_not_block_image_removal_but_active_mapping_does(self):
+        for remaining, removed in (({"loopdevices": [{"name": "/dev/loop99"}]}, True),
+                                   ({"loopdevices": [{"name": self.device}]}, False), ({}, False)):
+            with self.subTest(remaining=remaining):
+                self.image.write_bytes(b"a" * 4096)
+                metadata = self.image.stat()
+                receipt = {"run_id": "123", "attempt": "1", "root_device": self.root.stat().st_dev,
+                           "root_inode": self.root.stat().st_ino, "loop_device": self.device,
+                           "image_inode": metadata.st_ino, "image_device": metadata.st_dev,
+                           "budget": {"loop_bytes": 4096}, "state": "mounted"}
+                record = {**self.record, "back-ino": metadata.st_ino,
+                          "back-maj:min": str(os.major(metadata.st_dev)) + ":" + str(os.minor(metadata.st_dev)), "sizelimit": 4096}
+                def execute(args, **kwargs):
+                    if args == ["sudo", "-n", "losetup", "--detach", self.device]:
+                        return ""
+                    if args == ["sudo", "-n", "losetup", "--list", "--json", "--output", "NAME"]:
+                        return json.dumps(remaining)
+                    self.fail("Unexpected cleanup command: " + str(args))
+                with patch.object(volume, "volume_root", return_value=self.root), \
+                     patch.object(volume, "loop_record", return_value=record), \
+                     patch.object(volume, "mounted_at", return_value=[]), \
+                     patch.object(volume, "unit_state", return_value="inactive"), patch.object(volume, "run", side_effect=execute):
+                    if removed:
+                        volume.remove_volume(self.root, receipt)
+                        self.assertEqual(json.loads((self.root / "volume.json").read_text())["state"], "removed")
+                    else:
+                        with self.assertRaises(QualificationError):
+                            volume.remove_volume(self.root, receipt)
+                self.assertEqual(self.image.exists(), not removed)
 
 
 if __name__ == "__main__":

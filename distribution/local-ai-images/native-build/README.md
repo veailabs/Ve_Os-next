@@ -39,6 +39,8 @@ Exports are limited to 3 GiB OCI, 4 GiB complete source including context/eviden
 
 Optional SDK reclamation defaults to false and removes only `/usr/share/dotnet`, `/usr/share/swift` and x64 `/usr/local/lib/android` on the dedicated ephemeral runner. Symlinks, noncanonical paths and mounted/nested-mounted paths are rejected. Actual reclaimed bytes are measured; no assumed SDK size is used for admission.
 
+Cleanup passes the validated device directly to `losetup --detach`, which works with both older required-argument and newer no-argument option parsers. It verifies absence from the active mapping inventory before unlinking the owned image; an unused `/dev/loopN` node is not an attached mapping. Identity, stopped-unit and mount checks still precede detachment. Failures report the exception chain so a cleanup error cannot hide an earlier stage error. Fixed privileged filesystem commands include at most 2048 characters of JSON-escaped stderr; general command arguments and stderr are omitted. Failed smoke/service logs expose only a bounded JSON-escaped tail, never workflow command text.
+
 ## Source and image proof
 
 `llamacpp-inputs.json` binds every context file by size and SHA-256. Staging rejects additional, changed, linked or special files. Context tar bytes are deterministic, and image source labels use the existing publisher's context-hash convention. Reviewed Git SHA/run provenance remains separate.

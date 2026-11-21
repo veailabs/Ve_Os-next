@@ -17,7 +17,11 @@ def run(args, timeout=60, deadline=None):
         require(timeout > 0, "Native stage deadline reached")
     result = subprocess.run(args, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, timeout=timeout)
-    require(result.returncode == 0, "Required inventory command failed: " + args[0])
+    if result.returncode != 0:
+        diagnostic = {"command": args[0], "exit_code": result.returncode}
+        if len(args) >= 3 and args[:2] == ["sudo", "-n"] and args[2] in {"losetup", "mount", "umount", "mkdir", "chown"}:
+            diagnostic.update(command="sudo " + args[2], stderr=result.stderr[:2048])
+        raise QualificationError("Required inventory command failed: " + json.dumps(diagnostic))
     require(len(result.stdout) <= PROFILE["document_bytes"], "Inventory command output exceeded its limit")
     return result.stdout.strip()
 
