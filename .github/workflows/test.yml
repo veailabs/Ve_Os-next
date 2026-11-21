@@ -1,0 +1,51 @@
+name: Local AI publication checks
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      verify_release_archive:
+        description: Download and verify actual reviewed release and source assets
+        type: boolean
+        default: false
+      runtime:
+        description: Actual reviewed runtime record
+        type: choice
+        options: [tensorfold]
+        default: tensorfold
+
+permissions:
+  contents: read
+
+jobs:
+  publisher:
+    if: ${{ github.event.repository.private == false && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check publication boundaries and actual source snapshots
+        run: python3 distribution/local-ai-images/check.py
+      - name: Verify actual release archives without publishing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_release_archive && github.repository_id == '1465654995' && github.ref == 'refs/heads/master' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNTIME: ${{ inputs.runtime }}
+        run: python3 distribution/local-ai-images/publish.py verify-release "$RUNTIME" "$RUNNER_TEMP/ve-os-image-check"
+      - name: Remove temporary release archive
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/ve-os-image-check"
+
+  ci-ok:
+    if: ${{ always() && github.event.repository.private == false && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    needs: [publisher]
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.publisher.result }}
+        run: test "$RESULT" = success

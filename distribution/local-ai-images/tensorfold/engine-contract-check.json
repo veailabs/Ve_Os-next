@@ -1,0 +1,18 @@
+{
+  "runtime": "tensorfold",
+  "required_cli_options": [
+    "--context",
+    "--drafter",
+    "--host",
+    "--name",
+    "--no-update-check",
+    "--port",
+    "--temperature",
+    "--top-k",
+    "--top-p"
+  ],
+  "missing_options": [],
+  "unresolved_shared_libraries": false,
+  "executable_version": "tensorfold-native 1.2.10",
+  "hardware_inference": "not-tested"
+}

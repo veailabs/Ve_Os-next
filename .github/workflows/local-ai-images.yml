@@ -1,0 +1,57 @@
+name: Publish reviewed local AI image
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: Reviewed runtime image
+        required: true
+        type: choice
+        options:
+          - tensorfold
+          - sdcpp-cuda
+          - tensorfold-dsv41
+          - tensorfold-glm53
+          - tensorfold-nemotron-bolt
+          - llamacpp
+          - sdcpp
+          - acestep
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-ai-image-${{ inputs.runtime }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_id == '1465654995' && github.ref == 'refs/heads/master' && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: ve-os-image-publication
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RUNTIME: ${{ inputs.runtime }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify the reviewed release and protected master
+        run: python3 distribution/local-ai-images/publish.py preflight "$RUNTIME"
+      - name: Test publication validation
+        run: python3 distribution/local-ai-images/test_publish.py
+      - name: Install the registry transport
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends skopeo
+      - name: Publish and verify anonymous digest pull
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 distribution/local-ai-images/publish.py publish "$RUNTIME" "$RUNNER_TEMP/ve-os-image-publication"
+      - name: Remove temporary archives and registry credentials
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/ve-os-image-publication"
