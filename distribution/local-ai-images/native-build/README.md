@@ -6,7 +6,7 @@ The implementation is locally testable. No successful hosted native build, compl
 
 ## Execution and approval
 
-`local-ai-runner-qualification.yml` measures standard x64 and ARM runners sequentially, then runs the x64 isolation smoke. It is contents-read-only and compiles no engine. ARM inventory cannot qualify the x64 profile.
+`local-ai-runner-qualification.yml` measures standard x64 and ARM runners sequentially, then runs the x64 isolation smoke. It is contents-read-only and compiles no engine. ARM inventory cannot qualify the x64 profile. The qualification workflow disables Python bytecode writes, matching build/export and CI, so its tests leave the hash-locked build context unchanged.
 
 `local-ai-native-build.yml` first checks the already-existing destination in a contents-read-only job. The protected build/export job then requires the owner review in environment `ve-os-image-build-export`, ID `28071521718`. The non-secret repository variable `VE_OS_IMAGE_BUILD_EXPORT_ENVIRONMENT_ID` must match that actual ID. Repository ID `1465654995`, public visibility, protected master at the dispatched SHA, owner reviewer `214956837`, protected-branch-only deployment and disabled admin bypass are verified before allocation and again before upload. Missing configuration fails preflight; the workflow does not create an unprotected environment.
 
