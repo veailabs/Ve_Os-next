@@ -32,6 +32,25 @@ class SourceAcquisitionTests(unittest.TestCase):
         acquire.source_integrity({"source": ["https://example.invalid/source.tar.gz", "https://example.invalid/source.tar.gz.sig", "git+https://example.invalid/source.git#commit=" + "a" * 40],
                                   "sha256sums": ["b" * 64, "SKIP", "SKIP"]})
 
+    def test_verified_signed_coreutils_and_gitlink_sources_pass_integrity(self):
+        sources = ["git+https://git.savannah.gnu.org/git/coreutils.git?signed#tag=v9.12",
+                   "git+https://git.savannah.gnu.org/git/gnulib.git"]
+        srcinfo = {"source": sources, "b2sums": ["SKIP", "SKIP"]}
+        responses = [b"", acquire.COREUTILS_COMMIT.encode(), acquire.COREUTILS_TREE.encode(),
+                     ("160000 commit " + acquire.GNULIB_COMMIT + "\tgnulib").encode(), acquire.GNULIB_TREE.encode(), b""]
+        with patch.object(self.acquisition, "run", side_effect=responses) as run:
+            resolved, proof = self.acquisition.resolve_sources("coreutils", srcinfo, self.root)
+        acquire.source_integrity(srcinfo, resolved)
+        self.assertEqual(set(resolved), set(sources))
+        self.assertEqual(proof["commit"], acquire.GNULIB_COMMIT)
+        self.assertEqual(run.call_args_list[0].args[0], ["makepkg", "--verifysource", "--noconfirm", "--nocolor"])
+        self.assertTrue(all(call.kwargs["user"] for call in run.call_args_list))
+        for index in (0, 1, 2, 3, 4, 5):
+            failures = list(responses)
+            failures[index] = RuntimeError("verification failed") if index in (0, 5) else b"changed identity"
+            with self.subTest(check=index), patch.object(self.acquisition, "run", side_effect=failures), self.assertRaises(RuntimeError):
+                self.acquisition.resolve_sources("coreutils", srcinfo, self.root)
+
     def test_source_checksum_coverage_and_arch_scope_are_enforced(self):
         for value in ({"source": ["source"]}, {"source": ["one", "two"], "sha256sums": ["a" * 64]},
                       {"source_x86_64": ["source"], "sha256sums_x86_64": ["SKIP"]}):

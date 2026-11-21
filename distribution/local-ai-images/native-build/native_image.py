@@ -28,6 +28,7 @@ def verify_package_files(observed, source_root, context, source_proof, deadline)
     files_by_layer = {layer["layer"]: layer["entries"] for layer in observed["physical_files"]}
     covered = set()
     changed = set()
+    changed_directories = set()
     for package in observed["physical_packages"]:
         key = tuple(package[name] for name in ("name", "version", "base", "architecture"))
         require(key in original, "Distributed package has no original producer/source binding: " + package["name"] + " " + package["version"])
@@ -56,13 +57,15 @@ def verify_package_files(observed, source_root, context, source_proof, deadline)
                     seen_owned.add(path)
                     for layer in package["layers"]:
                         actual = files_by_layer[layer].get(path)
-                        if actual is None or actual["kind"] == "directory":
+                        if actual is None:
                             continue
                         identity = (layer, path)
                         if matches(expected, actual):
                             covered.add(identity)
                         else:
                             changed.add(identity)
+                            if "directory" in {expected["kind"], actual["kind"]}:
+                                changed_directories.add(identity)
         require(seen_owned == owned, "Installed package ownership differs from original archive: " + package["name"])
     output_entry = observed["filesystem"].get("usr/share/ve-os-local-ai/installed-output-files.json")
     require(output_entry is not None and output_entry["sha256"] in observed["metadata_blobs"], "Actual compiler output inventory is missing")
@@ -75,10 +78,17 @@ def verify_package_files(observed, source_root, context, source_proof, deadline)
     source_files = source_proof["upstream_files"]["llama.cpp"]
     generated = []
     unexplained = []
+    directories = []
     for layer, entries in files_by_layer.items():
         for path, actual in entries.items():
             require(time.monotonic() < deadline, "Image/source correspondence deadline exceeded")
-            if actual["kind"] == "directory" or (layer, path) in covered:
+            if (layer, path) in changed_directories:
+                unexplained.append({"layer": layer, "path": path, "reason": "modified-package-file"})
+                continue
+            if (layer, path) in covered:
+                continue
+            if actual["kind"] == "directory":
+                directories.append((layer, path, actual))
                 continue
             expected_context = path.removeprefix("locks/") if path.startswith("locks/") else "pacman.conf" if path == "etc/pacman.conf" else "packaging-LICENSE" if path == "usr/share/licenses/ve-os-local-ai/LICENSE" else None
             if expected_context in context_files and actual.get("sha256") == context_files[expected_context]:
@@ -103,6 +113,12 @@ def verify_package_files(observed, source_root, context, source_proof, deadline)
                 generated.append({"layer": layer, "path": path, "source": "package-manager-or-reviewed-build-evidence"})
                 continue
             unexplained.append({"layer": layer, "path": path, "reason": "modified-package-file" if (layer, path) in changed else "unowned-distributed-file"})
+    generated_parents = {(item["layer"], parent.as_posix()) for item in generated for parent in Path(item["path"]).parents if parent.as_posix() != "."}
+    for layer, path, actual in directories:
+        if (layer, path) in generated_parents and all(actual[field] == value for field, value in (("uid", 0), ("gid", 0), ("mode", 0o755))):
+            generated.append({"layer": layer, "path": path, "source": "reviewed-generated-parent-directory"})
+        else:
+            unexplained.append({"layer": layer, "path": path, "reason": "unowned-distributed-directory"})
     return {"system_format": "arch-pacman", "physical_packages": [{key: value for key, value in package.items() if key != "metadata_versions"} for package in observed["physical_packages"]],
             "final_packages": observed["final_packages"], "matched_physical_paths": len(covered), "generated_paths": generated,
             "unexplained_paths": unexplained, "complete": not unexplained}

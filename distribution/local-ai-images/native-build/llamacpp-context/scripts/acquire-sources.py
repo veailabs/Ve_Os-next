@@ -259,6 +259,26 @@ class Acquisition:
         signature.unlink()
         return proof
 
+    def resolve_sources(self, base, srcinfo, work):
+        resolved = []
+        vcs_proof = None
+        coreutils_source = "git+https://git.savannah.gnu.org/git/coreutils.git?signed#tag=v9.12"
+        gnulib_source = "git+https://git.savannah.gnu.org/git/gnulib.git"
+        if base == "coreutils" and gnulib_source in srcinfo.get("source", []):
+            require(coreutils_source in srcinfo["source"], "Unpinned gnulib has no reviewed parent source")
+            self.run(["makepkg", "--verifysource", "--noconfirm", "--nocolor"], cwd=work, user=True)
+            core = work / "sources/coreutils"
+            gnulib = work / "sources/gnulib"
+            require(self.run(["git", "--git-dir=" + str(core), "rev-parse", "v9.12^{commit}"], cwd=work, user=True).decode().strip() == COREUTILS_COMMIT, "Coreutils tag resolved to a different commit")
+            require(self.run(["git", "--git-dir=" + str(core), "rev-parse", "v9.12^{tree}"], cwd=work, user=True).decode().strip() == COREUTILS_TREE, "Coreutils source tree differs")
+            link = self.run(["git", "--git-dir=" + str(core), "ls-tree", "v9.12", "gnulib"], cwd=work, user=True).decode().strip()
+            require(link == "160000 commit " + GNULIB_COMMIT + "\tgnulib", "Coreutils gnulib gitlink differs")
+            require(self.run(["git", "--git-dir=" + str(gnulib), "rev-parse", GNULIB_COMMIT + "^{tree}"], cwd=work, user=True).decode().strip() == GNULIB_TREE, "Original gnulib commit is unavailable or differs")
+            self.run(["git", "--git-dir=" + str(gnulib), "fsck", "--full", "--strict"], cwd=work, user=True)
+            resolved.extend((coreutils_source, gnulib_source))
+            vcs_proof = {"parent_commit": COREUTILS_COMMIT, "parent_tree": COREUTILS_TREE, "gitlink": "gnulib", "commit": GNULIB_COMMIT, "tree": GNULIB_TREE}
+        return resolved, vcs_proof
+
     def recipe(self, base, version, expected_hash, slot):
         project = quote("archlinux/packaging/packages/" + base, safe="")
         tag = version.replace(":", "-", 1).replace("~", ".")
@@ -299,22 +319,7 @@ class Acquisition:
         for fingerprint in srcinfo.get("validpgpkeys", []):
             require(re.fullmatch(r"[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64}", fingerprint), "Invalid complete source signing fingerprint")
             self.run(["gpg", "--batch", "--keyserver", "hkps://keyserver.ubuntu.com", "--recv-keys", fingerprint], cwd=work, user=True)
-        resolved = []
-        vcs_proof = None
-        gnulib_source = "git+https://git.savannah.gnu.org/git/gnulib.git"
-        if base == "coreutils" and gnulib_source in srcinfo.get("source", []):
-            require("git+https://git.savannah.gnu.org/git/coreutils.git?signed#tag=v9.12" in srcinfo["source"], "Unpinned gnulib has no reviewed parent source")
-            self.run(["makepkg", "--verifysource", "--noconfirm", "--nocolor"], cwd=work, user=True)
-            core = work / "sources/coreutils"
-            gnulib = work / "sources/gnulib"
-            require(self.run(["git", "--git-dir=" + str(core), "rev-parse", "v9.12^{commit}"], cwd=work, user=True).decode().strip() == COREUTILS_COMMIT, "Coreutils tag resolved to a different commit")
-            require(self.run(["git", "--git-dir=" + str(core), "rev-parse", "v9.12^{tree}"], cwd=work, user=True).decode().strip() == COREUTILS_TREE, "Coreutils source tree differs")
-            link = self.run(["git", "--git-dir=" + str(core), "ls-tree", "v9.12", "gnulib"], cwd=work, user=True).decode().strip()
-            require(link == "160000 commit " + GNULIB_COMMIT + "\tgnulib", "Coreutils gnulib gitlink differs")
-            require(self.run(["git", "--git-dir=" + str(gnulib), "rev-parse", GNULIB_COMMIT + "^{tree}"], cwd=work, user=True).decode().strip() == GNULIB_TREE, "Original gnulib commit is unavailable or differs")
-            self.run(["git", "--git-dir=" + str(gnulib), "fsck", "--full", "--strict"], cwd=work, user=True)
-            resolved.append(gnulib_source)
-            vcs_proof = {"parent_commit": COREUTILS_COMMIT, "parent_tree": COREUTILS_TREE, "gitlink": "gnulib", "commit": GNULIB_COMMIT, "tree": GNULIB_TREE}
+        resolved, vcs_proof = self.resolve_sources(base, srcinfo, work)
         source_integrity(srcinfo, resolved)
         self.run(["makepkg", "--allsource", "--noconfirm", "--nocolor"], cwd=work, user=True)
         outputs = list((work / "archives").glob("*.src.tar.gz"))

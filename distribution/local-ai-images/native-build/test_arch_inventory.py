@@ -9,12 +9,13 @@ import arch_inventory as arch
 from native_profile import PROFILE, QualificationError
 
 
-def layer(files, extra=()):
+def layer(files, extra=(), pax_headers=None):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w", format=tarfile.PAX_FORMAT) as archive:
         for name, data in files.items():
             member = tarfile.TarInfo(name)
             member.size = len(data)
+            member.pax_headers = (pax_headers or {}).get(name, {})
             archive.addfile(member, io.BytesIO(data))
         for member in extra:
             archive.addfile(member)
@@ -37,6 +38,14 @@ class ArchLayerTests(unittest.TestCase):
         self.assertEqual(report["final_packages"][0]["version"], "1-1")
         self.assertEqual(report["filesystem"]["usr/bin/fixture"]["sha256"], hashlib.sha256(b"first").hexdigest())
         self.assertEqual(set(report["final_packages"][0]["metadata"]), {"desc", "files", "mtree"})
+
+    def test_security_attributes_cannot_hide_behind_unchanged_executable_bytes(self):
+        for key in ("SCHILY.xattr.security.capability", "SCHILY.xattr.security.selinux", "SCHILY.acl.access",
+                    "LIBARCHIVE.xattr.security.capability", "SCHILY.fflags", "unknown.security.attribute"):
+            with self.subTest(attribute=key), self.assertRaisesRegex(QualificationError, "Unsupported archive extended attributes"):
+                arch.observe_layers([layer(package(), pax_headers={"usr/bin/fixture": {key: "added privilege"}})])
+        report = arch.observe_layers([layer(package(), pax_headers={"usr/bin/fixture": {"mtime": "123.25"}})])
+        self.assertEqual(report["filesystem"]["usr/bin/fixture"]["sha256"], hashlib.sha256(b"first").hexdigest())
 
     def test_upgrade_preserves_distributed_old_source_identity(self):
         upgrade = package(version="2-1", payload=b"second")

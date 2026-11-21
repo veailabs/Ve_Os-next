@@ -1,5 +1,8 @@
+from contextlib import contextmanager
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import tempfile
 import time
@@ -80,6 +83,85 @@ class ExportStagingTests(unittest.TestCase):
             with self.assertRaisesRegex(QualificationError, "input set"):
                 export.freeze_export(self.work, staged, manifest, time.monotonic() + 10)
             run.assert_not_called()
+
+    @contextmanager
+    def freeze_filesystem(self, staged, mutate=False):
+        real_root = os.geteuid() == 0
+        builder_uid = 65534 if real_root else os.getuid()
+        path_stat, descriptor_stat = Path.stat, os.fstat
+        owners = {}
+        if real_root:
+            for path in [staged, *staged.iterdir()]:
+                os.chown(path, builder_uid, builder_uid)
+        else:
+            parent = path_stat(self.work.parent)
+            owners[(parent.st_dev, parent.st_ino)] = (0, 0)
+
+        def metadata(value):
+            owner = owners.get((value.st_dev, value.st_ino))
+            if owner is None:
+                return value
+            fields = list(value)
+            fields[4:6] = owner
+            return os.stat_result(fields)
+
+        def execute(command, **kwargs):
+            self.assertEqual(command[:2], ["sudo", "-n"])
+            operation = command[2]
+            if operation == "mv":
+                self.assertEqual(command[3], "--")
+                Path(command[4]).rename(command[5])
+            elif operation == "chown":
+                self.assertEqual(command[3:5], ["0:0", "--"])
+                for value in command[5:]:
+                    if real_root:
+                        os.chown(value, 0, 0)
+                    else:
+                        current = path_stat(Path(value))
+                        owners[(current.st_dev, current.st_ino)] = (0, 0)
+            elif operation == "chmod":
+                self.assertEqual(command[4], "--")
+                for value in command[5:]:
+                    Path(value).chmod(int(command[3], 8))
+                if mutate and command[3] == "0555":
+                    path = Path(command[5]) / "image.oci.tar"
+                    path.chmod(0o644)
+                    payload = path.read_bytes()
+                    path.write_bytes(b"x" + payload[1:])
+                    path.chmod(0o444)
+            else:
+                self.fail("Unexpected privileged operation")
+            return ""
+
+        with patch("native_process.stop_unit") as stop, patch("native_volume.verify_work_volume") as volume, \
+             patch("runner_resources.run", side_effect=execute) as run, patch.object(export.os, "getuid", return_value=builder_uid), \
+             patch.object(Path, "stat", lambda path, **kwargs: metadata(path_stat(path, **kwargs))), \
+             patch.object(os, "fstat", lambda descriptor: metadata(descriptor_stat(descriptor))):
+            yield run, stop, volume
+
+    def test_successful_freeze_enforces_ownership_modes_and_verifies_every_descriptor(self):
+        staged, manifest = export.stage_export(self.work, self.source, "123", "1")
+        with self.freeze_filesystem(staged) as (run, stop, volume):
+            with patch.object(export, "verify_stream", wraps=export.verify_stream) as verify:
+                frozen = export.freeze_export(self.work, staged, manifest, time.monotonic() + 10)
+            stop.assert_called_once()
+            volume.assert_called_once_with(self.work, self.unit)
+            self.assertEqual([call.args[0][2] for call in run.call_args_list], ["mv", "chown", "chmod", "chmod"])
+            self.assertFalse(staged.exists())
+            self.assertEqual(frozen.stat().st_uid, 0)
+            self.assertEqual(stat.S_IMODE(frozen.stat().st_mode), 0o555)
+            for path in frozen.iterdir():
+                self.assertEqual((path.stat().st_uid, path.stat().st_gid, stat.S_IMODE(path.stat().st_mode)), (0, 0, 0o444))
+            self.assertEqual(export.load_manifest(frozen), manifest)
+            self.assertEqual(verify.call_count, len(export.upload_assets(manifest)))
+        frozen.chmod(0o755)
+
+    def test_mutation_during_freeze_is_rejected_by_final_descriptor_verification(self):
+        staged, manifest = export.stage_export(self.work, self.source, "123", "1")
+        with self.freeze_filesystem(staged, mutate=True):
+            with self.assertRaisesRegex(QualificationError, "Frozen asset bytes changed"):
+                export.freeze_export(self.work, staged, manifest, time.monotonic() + 10)
+        (self.work.parent / "frozen").chmod(0o755)
 
     def test_missing_environment_id_fails_before_any_allocation(self):
         with patch.object(execution, "workflow_identity", return_value=(self.source, "veailabs/Ve_Os-next")), \

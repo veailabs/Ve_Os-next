@@ -282,6 +282,35 @@ class HttpBoundaryTests(unittest.TestCase):
             with self.assertRaises(QualificationError):
                 client.json(method, endpoint)
 
+    def test_upload_sends_exact_authenticated_endpoint_length_and_body(self):
+        payload = b"bounded upload bytes" * 8000
+        asset = {"name": "llamacpp source.tar", "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+        connection = FakeConnection(FakeResponse(201, b'{"id":321}', {}))
+        client = self.client()
+        with patch.object(release.http.client, "HTTPSConnection", return_value=connection) as connect:
+            result = client.upload(45, asset, io.BytesIO(payload + b"excluded suffix"))
+        self.assertEqual(connect.call_args.args, ("uploads.github.com",))
+        self.assertEqual(connection.upload_request, ("POST", "/repos/veailabs/Ve_Os-next/releases/45/assets?name=llamacpp%20source.tar", True))
+        self.assertEqual(connection.headers["Authorization"], "Bearer fixture-token")
+        self.assertEqual(connection.headers["Content-Length"], str(len(payload)))
+        self.assertEqual(connection.headers["Content-Type"], "application/octet-stream")
+        self.assertEqual(b"".join(connection.sent), payload)
+        self.assertTrue(all(len(chunk) <= 65536 for chunk in connection.sent))
+        self.assertTrue(connection.ended)
+        self.assertTrue(connection.closed)
+        self.assertEqual(client.uploaded, len(payload))
+        self.assertEqual(result, {"id": 321})
+
+    def test_upload_rejects_non_success_and_still_closes_connection(self):
+        payload = b"fixture"
+        asset = {"name": "source.tar", "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+        for status in (200, 302, 403, 422, 500):
+            connection = FakeConnection(FakeResponse(status, b'{"id":321}', {}))
+            with self.subTest(status=status), patch.object(release.http.client, "HTTPSConnection", return_value=connection):
+                with self.assertRaisesRegex(QualificationError, "upload did not complete"):
+                    self.client().upload(45, asset, io.BytesIO(payload))
+                self.assertTrue(connection.closed)
+
     def test_allowed_download_redirect_never_receives_token(self):
         payload = b"verified fixture"
         expected = {"bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
@@ -323,6 +352,24 @@ class FakeConnection:
     def __init__(self, response):
         self.response = response
         self.requests = []
+        self.headers = {}
+        self.sent = []
+        self.ended = False
+        self.closed = False
+
+    def putrequest(self, method, endpoint, skip_accept_encoding=False):
+        self.upload_request = method, endpoint, skip_accept_encoding
+
+    def putheader(self, name, value):
+        self.headers[name] = value
+
+    def endheaders(self):
+        self.ended = True
+
+    def send(self, data):
+        if not self.ended:
+            raise AssertionError("Body sent before headers")
+        self.sent.append(data)
 
     def request(self, method, endpoint, body=None, headers=None):
         self.requests.append((method, endpoint, headers))
@@ -331,7 +378,7 @@ class FakeConnection:
         return self.response
 
     def close(self):
-        pass
+        self.closed = True
 
 
 if __name__ == "__main__":

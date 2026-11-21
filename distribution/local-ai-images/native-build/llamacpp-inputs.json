@@ -55,13 +55,13 @@
     },
     {
       "path": "scripts/README.md",
-      "bytes": 503,
-      "sha256": "d7500a2da5fd8768af5ae4824e2a577a033a918bd2de97ef02286e5dfb7c1a9e"
+      "bytes": 639,
+      "sha256": "aa821e7883a747b4d9079cfbf6d2a8fd8fe0bd569882e34f08c7bc0962acac8c"
     },
     {
       "path": "scripts/acquire-sources.py",
-      "bytes": 25845,
-      "sha256": "3134a32e53c95d07549edc95a2137e54c0cbd76cb38ca4e9e313caa07ba8395f"
+      "bytes": 26069,
+      "sha256": "eb20e5d2e9facb1f6dc209cf756fadeb2980e882845670e6549b6c302acea993"
     },
     {
       "path": "scripts/capture-installed.py",

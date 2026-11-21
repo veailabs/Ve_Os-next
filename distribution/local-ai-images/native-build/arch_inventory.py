@@ -18,7 +18,10 @@ class BoundedTarInfo(tarfile.TarInfo):
         if self.type in {tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.SOLARIS_XHDTYPE, tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK}:
             require(self.size <= PROFILE["document_bytes"], "Tar extended metadata exceeds limit")
         require(self.type != tarfile.GNUTYPE_SPARSE, "Sparse archive records require separate validation")
-        return super()._proc_member(archive)
+        member = super()._proc_member(archive)
+        require(set(member.pax_headers) <= {"path", "linkpath", "size", "uid", "gid", "uname", "gname", "mtime", "atime", "ctime"},
+                "Unsupported archive extended attributes")
+        return member
 
     def _proc_gnusparse_00(self, *arguments):
         raise QualificationError("Sparse archive records require separate validation")

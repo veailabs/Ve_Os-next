@@ -202,6 +202,15 @@ class BuilderTests(unittest.TestCase):
         with self.assertRaises(QualificationError):
             builder.verify_group(wrong, self.unit)
 
+    def test_verified_source_compilation_has_no_network(self):
+        source_image = "sha256:" + "c" * 64
+        command = builder.container_command(self.root, "a" * 40, "veailabs/Ve_Os-next", Path("/user.slice/unit/containers"),
+                                            "b" * 64, mode="build", source_image=source_image)
+        self.assertEqual([argument for argument in command if argument.startswith("--network=")], ["--network=none"])
+        self.assertIn("--build-arg=SOURCE_BASE=" + source_image, command)
+        self.assertIn("--pull=never", command)
+        self.assertIn("--target=build", command)
+
     def test_constructed_service_and_container_commands_have_no_credential_or_mount_channel(self):
         with patch.dict(os.environ, {"GH_TOKEN": "test-never-forward", "ACTIONS_RUNTIME_TOKEN": "test-runtime"}):
             service = builder.service_command(self.root, "a" * 40, "veailabs/Ve_Os-next", "123", "1", 1000)
