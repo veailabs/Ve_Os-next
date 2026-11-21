@@ -28,7 +28,7 @@ def isolated_environment(work, uid):
 
 def validate_source_identity(source_sha, repository):
     require(re.fullmatch(r"[0-9a-f]{40}", source_sha) is not None, "Invalid reviewed source identity")
-    require(repository in {"veailabs/Ve_Os-next", "veailabs/Ve_Os"}, "Unexpected source repository")
+    require(repository in {"veailabs/Ve_Os-next", "veailabs/VE-OS"}, "Unexpected source repository")
 
 
 def service_command(work, source_sha, repository, run_id, attempt, uid, mode="build"):

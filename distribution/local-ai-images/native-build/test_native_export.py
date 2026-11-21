@@ -30,7 +30,7 @@ def fixture():
 
 
 class FakeClient:
-    repository = "veailabs/Ve_Os-next"
+    repository = "veailabs/VE-OS"
     prefix = "/repos/" + repository
 
     def __init__(self, manifest):
@@ -251,7 +251,7 @@ class DraftTransportTests(unittest.TestCase):
 
 class HttpBoundaryTests(unittest.TestCase):
     def client(self):
-        return release.GitHubReleaseClient("veailabs/Ve_Os-next", "fixture-token", time.monotonic() + 30)
+        return release.GitHubReleaseClient("veailabs/VE-OS", "fixture-token", time.monotonic() + 30)
 
     def test_byte_caps_are_atomic_and_shared(self):
         client = self.client()
@@ -272,10 +272,11 @@ class HttpBoundaryTests(unittest.TestCase):
 
     def test_token_or_destination_injection_is_rejected_without_echo(self):
         with self.assertRaises(QualificationError) as raised:
-            release.GitHubReleaseClient("veailabs/Ve_Os-next", "DO_NOT_ECHO\nsecret", time.monotonic() + 30)
+            release.GitHubReleaseClient("veailabs/VE-OS", "DO_NOT_ECHO\nsecret", time.monotonic() + 30)
         self.assertNotIn("DO_NOT_ECHO", str(raised.exception))
-        with self.assertRaises(QualificationError):
-            release.GitHubReleaseClient("attacker/repository", "fixture-token", time.monotonic() + 30)
+        for repository in ("attacker/repository", "veailabs/Ve_Os"):
+            with self.subTest(repository=repository), self.assertRaises(QualificationError):
+                release.GitHubReleaseClient(repository, "fixture-token", time.monotonic() + 30)
         client = self.client()
         for method, endpoint in (("DELETE", client.prefix + "/releases/1"), ("POST", client.prefix + "/contents/file"),
                                  ("GET", "/repos/attacker/repo/releases")):
@@ -290,7 +291,7 @@ class HttpBoundaryTests(unittest.TestCase):
         with patch.object(release.http.client, "HTTPSConnection", return_value=connection) as connect:
             result = client.upload(45, asset, io.BytesIO(payload + b"excluded suffix"))
         self.assertEqual(connect.call_args.args, ("uploads.github.com",))
-        self.assertEqual(connection.upload_request, ("POST", "/repos/veailabs/Ve_Os-next/releases/45/assets?name=llamacpp%20source.tar", True))
+        self.assertEqual(connection.upload_request, ("POST", "/repos/veailabs/VE-OS/releases/45/assets?name=llamacpp%20source.tar", True))
         self.assertEqual(connection.headers["Authorization"], "Bearer fixture-token")
         self.assertEqual(connection.headers["Content-Length"], str(len(payload)))
         self.assertEqual(connection.headers["Content-Type"], "application/octet-stream")

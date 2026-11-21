@@ -164,7 +164,7 @@ class ExportStagingTests(unittest.TestCase):
         (self.work.parent / "frozen").chmod(0o755)
 
     def test_missing_environment_id_fails_before_any_allocation(self):
-        with patch.object(execution, "workflow_identity", return_value=(self.source, "veailabs/Ve_Os-next")), \
+        with patch.object(execution, "workflow_identity", return_value=(self.source, "veailabs/VE-OS")), \
              patch.dict(execution.os.environ, {}, clear=True), patch.object(execution.volume, "create_volume") as allocate:
             with self.assertRaisesRegex(QualificationError, "environment ID"):
                 execution.prepare_export()

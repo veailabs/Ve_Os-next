@@ -180,7 +180,7 @@ class BuilderTests(unittest.TestCase):
         for run, attempt in (("1;touch x", "1"), ("0", "1"), ("1", "-1"), ("1/2", "1")):
             with self.subTest(run=run, attempt=attempt), self.assertRaises(QualificationError):
                 builder.unit_name(run, attempt)
-        for source, repository in (("master", "veailabs/Ve_Os"), ("a" * 40, "attacker/repo")):
+        for source, repository in (("master", "veailabs/VE-OS"), ("a" * 40, "veailabs/Ve_Os"), ("a" * 40, "attacker/repo")):
             with self.assertRaises(QualificationError):
                 builder.service_command(self.root, source, repository, "123", "1", 1000)
 
@@ -204,7 +204,7 @@ class BuilderTests(unittest.TestCase):
 
     def test_verified_source_compilation_has_no_network(self):
         source_image = "sha256:" + "c" * 64
-        command = builder.container_command(self.root, "a" * 40, "veailabs/Ve_Os-next", Path("/user.slice/unit/containers"),
+        command = builder.container_command(self.root, "a" * 40, "veailabs/VE-OS", Path("/user.slice/unit/containers"),
                                             "b" * 64, mode="build", source_image=source_image)
         self.assertEqual([argument for argument in command if argument.startswith("--network=")], ["--network=none"])
         self.assertIn("--build-arg=SOURCE_BASE=" + source_image, command)
@@ -213,8 +213,8 @@ class BuilderTests(unittest.TestCase):
 
     def test_constructed_service_and_container_commands_have_no_credential_or_mount_channel(self):
         with patch.dict(os.environ, {"GH_TOKEN": "test-never-forward", "ACTIONS_RUNTIME_TOKEN": "test-runtime"}):
-            service = builder.service_command(self.root, "a" * 40, "veailabs/Ve_Os-next", "123", "1", 1000)
-            command = builder.container_command(self.root, "a" * 40, "veailabs/Ve_Os-next", Path("/user.slice/unit/containers"), "b" * 64)
+            service = builder.service_command(self.root, "a" * 40, "veailabs/VE-OS", "123", "1", 1000)
+            command = builder.container_command(self.root, "a" * 40, "veailabs/VE-OS", Path("/user.slice/unit/containers"), "b" * 64)
         self.assertNotIn("test-never-forward", " ".join(service + command))
         self.assertNotIn("test-runtime", " ".join(service + command))
         for argument in command:
@@ -242,7 +242,7 @@ class BuilderTests(unittest.TestCase):
              patch.object(builder, "mounts", return_value=[]), patch.object(builder, "cgroups", return_value={"version": 1, "ancestors": []}), \
              patch.object(builder.Path, "read_text", host_text), patch.object(builder.os, "execve") as execute:
             with self.assertRaisesRegex(QualificationError, "Unified delegated|Rootless user"):
-                builder.child(work, "a" * 40, "veailabs/Ve_Os-next", self.unit)
+                builder.child(work, "a" * 40, "veailabs/VE-OS", self.unit)
             execute.assert_not_called()
 
 
